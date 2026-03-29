@@ -76,3 +76,21 @@ client/src/
 - **Phase 2** — Emoji reactions, message replies, disappearing messages
 - **Phase 3** — Image/media sharing
 - **Phase 4** — Animations, memory usage meter, sounds
+## Deployment
+
+### Recommended
+
+Deploy as a single Node web service so the frontend and Socket.IO backend share the same origin.
+
+This repo is ready for Render with the included `render.yaml`.
+
+### Render settings
+
+- Build command: `npm run build`
+- Start command: `npm start`
+- Health check path: `/health`
+
+### Optional environment variables
+
+- `CLIENT_ORIGIN` - comma-separated list of allowed frontend origins if you later split the frontend and backend across domains
+- `VITE_SOCKET_URL` - only needed for a split frontend/backend deployment; leave unset for same-origin hosting

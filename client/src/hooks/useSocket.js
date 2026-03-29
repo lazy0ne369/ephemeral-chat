@@ -2,12 +2,13 @@ import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 let socketInstance = null;
+const socketUrl = import.meta.env.VITE_SOCKET_URL || '/';
 
 export function useSocket() {
   const socketRef = useRef(null);
 
   if (!socketInstance) {
-    socketInstance = io('/', {
+    socketInstance = io(socketUrl, {
       transports: ['websocket'],
       autoConnect: true,
     });
