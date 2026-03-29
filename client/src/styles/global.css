@@ -1,0 +1,90 @@
+:root {
+  --bg-deep:     #0D1117;
+  --bg-surface:  #161B22;
+  --bg-sidebar:  #010409;
+  --bg-input:    #0D1117;
+  --bg-hover:    #1F2937;
+
+  --accent-green:  #00FF41;
+  --accent-blue:   #58A6FF;
+  --accent-red:    #FF4444;
+  --accent-yellow: #FFE66D;
+
+  --text-primary:  #E6EDF3;
+  --text-muted:    #8B949E;
+  --text-dim:      #484F58;
+
+  --border:        #30363D;
+  --border-bright: #58A6FF33;
+
+  --font-mono: 'JetBrains Mono', 'Share Tech Mono', monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* Selection */
+::selection { background: var(--accent-green); color: var(--bg-deep); }
+
+/* Focus */
+:focus-visible { outline: 1px solid var(--accent-green); outline-offset: 2px; }
+
+/* Animations */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glitch {
+  0%   { transform: translate(0); }
+  20%  { transform: translate(-2px, 2px); }
+  40%  { transform: translate(2px, -2px); }
+  60%  { transform: translate(-1px, 1px); filter: hue-rotate(90deg); }
+  80%  { transform: translate(1px, -1px); }
+  100% { transform: translate(0); filter: none; }
+}
+
+@keyframes scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+.animate-slide-in { animation: slideIn 0.15s ease-out forwards; }
