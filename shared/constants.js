@@ -48,7 +48,20 @@ export const LIMITS = {
   GRACE_PERIOD_MS: 60000,
   NICKNAME_MAX_LENGTH: 20,
   CHANNEL_NAME_MAX_LENGTH: 32,
+  MESSAGE_TEXT_MAX_LENGTH: 4000,
+  PASSWORD_MAX_LENGTH: 128,
+  // Maximum message events a socket may emit per second before being silently dropped
+  RATE_LIMIT_MESSAGES_PER_SECOND: 5,
 };
+
+// Allowed image MIME types for media uploads
+export const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+]);
 
 export const DISAPPEAR_OPTIONS = [
   { label: '10s', value: 10000 },

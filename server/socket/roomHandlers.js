@@ -12,7 +12,10 @@ export function registerRoomHandlers(io, socket) {
   socket.on(EVENTS.ROOM_CREATE, ({ nickname, password }) => {
     if (!nickname?.trim()) return;
     nickname = nickname.trim().slice(0, LIMITS.NICKNAME_MAX_LENGTH);
-    const { code, room, sessionId } = createRoom(socket.id, nickname, password?.trim() || null);
+    const safePassword = typeof password === 'string'
+      ? password.trim().slice(0, LIMITS.PASSWORD_MAX_LENGTH) || null
+      : null;
+    const { code, room, sessionId } = createRoom(socket.id, nickname, safePassword);
     socket.join(code);
     emitRoomJoined(socket, code, room, room.members[socket.id], sessionId);
     console.log(`[ROOM] Created: ${code} by ${nickname}${room.password ? ' (locked)' : ''}`);
@@ -29,7 +32,8 @@ export function registerRoomHandlers(io, socket) {
 
     if (existingRoom.password) {
       if (!password?.trim()) { socket.emit(EVENTS.ROOM_PASSWORD_REQUIRED, { code }); return; }
-      if (password.trim() !== existingRoom.password) { socket.emit(EVENTS.ROOM_ERROR, { reason: 'Incorrect password' }); return; }
+      const trimmedPassword = password.trim().slice(0, LIMITS.PASSWORD_MAX_LENGTH);
+      if (trimmedPassword !== existingRoom.password) { socket.emit(EVENTS.ROOM_ERROR, { reason: 'Incorrect password' }); return; }
     }
 
     const result = joinRoom(code, socket.id, nickname);

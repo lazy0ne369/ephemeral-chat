@@ -1209,7 +1209,7 @@ const styles = {
     color: '#dce6ec',
     fontSize: '0.85rem',
   },
-  memberDot: {
+  dropdownMemberSmallDot: {
     width: '0.5rem',
     height: '0.5rem',
     borderRadius: '50%',

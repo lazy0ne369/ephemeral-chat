@@ -1,5 +1,6 @@
 import { MEMBER_COLORS, LIMITS, MEMBER_ROLES } from '../../shared/constants.js';
 import { nanoid } from '../utils/nanoid.js';
+import { randomBytes } from 'node:crypto';
 
 const store = { rooms: {} };
 
@@ -8,9 +9,8 @@ function generateCode() {
   let code;
 
   do {
-    code = Array.from({ length: 6 }, () =>
-      chars[Math.floor(Math.random() * chars.length)]
-    ).join('');
+    const bytes = randomBytes(6);
+    code = Array.from(bytes, (byte) => chars[byte % chars.length]).join('');
   } while (store.rooms[code]);
 
   return code;
