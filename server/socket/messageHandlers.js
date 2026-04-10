@@ -19,7 +19,8 @@ const messageLimiter = createRateLimiter({
   refillRate: LIMITS.RATE_LIMIT_MESSAGES_PER_SECOND,
 });
 
-// Strip ASCII control characters (except tab/newline) and null bytes
+// Strip ASCII control characters except horizontal tab (\x09), newline (\x0A),
+// and carriage return (\x0D), which are acceptable in user text.
 function sanitizeText(raw) {
   return raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }

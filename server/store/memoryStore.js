@@ -1,6 +1,6 @@
 import { MEMBER_COLORS, LIMITS, MEMBER_ROLES } from '../../shared/constants.js';
 import { nanoid } from '../utils/nanoid.js';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 
 const store = { rooms: {} };
 
@@ -24,7 +24,7 @@ function assignColor(room) {
   );
 
   return MEMBER_COLORS.find((color) => !usedColors.has(color))
-    || MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)];
+    || MEMBER_COLORS[randomInt(MEMBER_COLORS.length)];
 }
 
 function createSessionRecord({ sessionId, nickname, color, role }) {

@@ -772,8 +772,6 @@ function HeaderBar({
   transferHost,
   kickMember,
 }) {
-  const isOnline = connectionState === 'connected';
-  
   return (
     <div style={styles.headerShell}>
       <header style={styles.header}>
