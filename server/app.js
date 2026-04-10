@@ -62,7 +62,7 @@ export function createAppServer(options = {}) {
 
   if (serveClient && existsSync(clientDistPath)) {
     app.use(express.static(clientDistPath));
-    app.get(/^(?!\/health$|\/socket\.io).*/, (_, res) => {
+    app.get(/^(?!\/health$|\/socket\.io).*/, httpRateLimit, (_, res) => {
       res.sendFile(path.join(clientDistPath, 'index.html'));
     });
   }
