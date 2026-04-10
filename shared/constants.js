@@ -1,23 +1,27 @@
 // Shared between client and server
 export const EVENTS = {
-  // Client → Server
+  // Client -> Server
   ROOM_CREATE: 'room:create',
   ROOM_JOIN: 'room:join',
+  ROOM_RESUME: 'room:resume',
+  ROOM_DELETE: 'room:delete',
   ROOM_LEAVE: 'room:leave',
   MESSAGE_SEND: 'message:send',
   MESSAGE_REACT: 'message:react',
   MEDIA_UPLOAD: 'media:upload',
   CHANNEL_CREATE: 'channel:create',
   MEMBER_KICK: 'member:kick',
+  MEMBER_ROLE_UPDATE: 'member:roleUpdate',
   TYPING_START: 'typing:start',
   TYPING_STOP: 'typing:stop',
 
-  // Server → Client
+  // Server -> Client
   ROOM_JOINED: 'room:joined',
   ROOM_DELETED: 'room:deleted',
   ROOM_KICKED: 'room:kicked',
   ROOM_HOST_WARNING: 'room:hostWarning',
   ROOM_HOST_BACK: 'room:hostBack',
+  ROOM_RESUME_FAILED: 'room:resumeFailed',
   ROOM_STATS_UPDATED: 'room:statsUpdated',
   ROOM_MEMBERS_UPDATED: 'room:membersUpdated',
   ROOM_ERROR: 'room:error',
@@ -26,6 +30,7 @@ export const EVENTS = {
   MESSAGE_REACTION_UPDATED: 'message:reactionUpdated',
   MEMBER_JOINED: 'member:joined',
   MEMBER_LEFT: 'member:left',
+  MEMBER_ROLE_UPDATED: 'member:roleUpdated',
   CHANNEL_ADDED: 'channel:added',
   TYPING_UPDATE: 'typing:update',
   MEDIA_TOO_LARGE: 'media:tooLarge',
@@ -46,10 +51,10 @@ export const LIMITS = {
 };
 
 export const DISAPPEAR_OPTIONS = [
-  { label: '10s',  value: 10000 },
-  { label: '1m',   value: 60000 },
-  { label: '5m',   value: 300000 },
-  { label: '1hr',  value: 3600000 },
+  { label: '10s', value: 10000 },
+  { label: '1m', value: 60000 },
+  { label: '5m', value: 300000 },
+  { label: '1hr', value: 3600000 },
   { label: 'never', value: null },
 ];
 
@@ -58,3 +63,9 @@ export const MEMBER_COLORS = [
   '#4ECDC4', '#FF8CC8', '#C084FC', '#FB923C',
   '#34D399', '#F87171', '#A78BFA', '#FBBF24',
 ];
+
+export const MEMBER_ROLES = {
+  HOST: 'host',
+  MODERATOR: 'moderator',
+  MEMBER: 'member',
+};

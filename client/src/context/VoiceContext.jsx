@@ -3,6 +3,7 @@ import {
   useEffect, useRef, useCallback
 } from 'react';
 import { useSocket } from '../hooks/useSocket';
+import { useRoom } from './RoomContext';
 
 const VoiceContext = createContext(null);
 
@@ -14,6 +15,7 @@ const ICE_SERVERS = [
 
 export function VoiceProvider({ children }) {
   const socket = useSocket();
+  const { roomStatus } = useRoom();
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [inVoice, setInVoice]               = useState(false);
@@ -200,7 +202,7 @@ export function VoiceProvider({ children }) {
     track.enabled = !track.enabled;
     setMuted(!track.enabled);
     socket.emit('voice:mute', { muted: !track.enabled });
-  }, []);
+  }, [socket]);
 
   // ── Socket event listeners ────────────────────────────────────────────────
   useEffect(() => {
@@ -267,6 +269,11 @@ export function VoiceProvider({ children }) {
       if (inVoice) leaveVoice();
     };
   }, []);
+
+  useEffect(() => {
+    if (roomStatus === 'active' || !inVoice) return;
+    leaveVoice();
+  }, [inVoice, leaveVoice, roomStatus]);
 
   return (
     <VoiceContext.Provider value={{
