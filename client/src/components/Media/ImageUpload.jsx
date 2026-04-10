@@ -55,13 +55,18 @@ export default function ImageUpload({ onError }) {
 
 const styles = {
   btn: {
-    background: 'transparent',
-    border: 'none',
+    minWidth: 40,
+    height: 40,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(88,166,255,0.09)',
+    border: '1px solid rgba(88,166,255,0.18)',
     cursor: 'pointer',
     fontSize: 16,
-    padding: '4px 6px',
-    borderRadius: 4,
-    opacity: 0.7,
-    transition: 'opacity 0.1s',
+    padding: 0,
+    borderRadius: 12,
+    color: '#c4ddff',
+    transition: 'background 0.15s, border-color 0.15s',
   },
 };

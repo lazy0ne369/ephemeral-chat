@@ -1,6 +1,6 @@
-import { EVENTS, LIMITS } from '../../shared/constants.js';
+import { EVENTS, LIMITS, MEMBER_ROLES } from '../../shared/constants.js';
 import {
-  createRoom, joinRoom, leaveRoom, deleteRoom,
+  createRoom, joinRoom, resumeRoom, leaveRoom, revokeMemberSession, updateMemberRole, deleteRoom,
   getRoom, getRoomBySocket, getRoomSnapshot, setTyping
 } from '../store/memoryStore.js';
 import { registerMessageHandlers } from './messageHandlers.js';
@@ -12,14 +12,12 @@ export function registerRoomHandlers(io, socket) {
   socket.on(EVENTS.ROOM_CREATE, ({ nickname, password }) => {
     if (!nickname?.trim()) return;
     nickname = nickname.trim().slice(0, LIMITS.NICKNAME_MAX_LENGTH);
-    const { code, room } = createRoom(socket.id, nickname, password?.trim() || null);
+    const safePassword = typeof password === 'string'
+      ? password.trim().slice(0, LIMITS.PASSWORD_MAX_LENGTH) || null
+      : null;
+    const { code, room, sessionId } = createRoom(socket.id, nickname, safePassword);
     socket.join(code);
-    socket.emit(EVENTS.ROOM_JOINED, {
-      code,
-      roomState: getRoomSnapshot(code),
-      you: { nickname, color: room.members[socket.id].color, isCreator: true },
-      hasPassword: !!room.password,
-    });
+    emitRoomJoined(socket, code, room, room.members[socket.id], sessionId);
     console.log(`[ROOM] Created: ${code} by ${nickname}${room.password ? ' (locked)' : ''}`);
   });
 
@@ -34,24 +32,87 @@ export function registerRoomHandlers(io, socket) {
 
     if (existingRoom.password) {
       if (!password?.trim()) { socket.emit(EVENTS.ROOM_PASSWORD_REQUIRED, { code }); return; }
-      if (password.trim() !== existingRoom.password) { socket.emit(EVENTS.ROOM_ERROR, { reason: 'Incorrect password' }); return; }
+      const trimmedPassword = password.trim().slice(0, LIMITS.PASSWORD_MAX_LENGTH);
+      if (trimmedPassword !== existingRoom.password) { socket.emit(EVENTS.ROOM_ERROR, { reason: 'Incorrect password' }); return; }
     }
 
     const result = joinRoom(code, socket.id, nickname);
     if (result.error) { socket.emit(EVENTS.ROOM_ERROR, { reason: result.error }); return; }
 
-    const { room } = result;
+    const { room, sessionId } = result;
     socket.join(code);
-    socket.emit(EVENTS.ROOM_JOINED, {
-      code,
-      roomState: getRoomSnapshot(code),
-      you: { nickname, color: room.members[socket.id].color, isCreator: false },
-      hasPassword: !!room.password,
-    });
+    emitRoomJoined(socket, code, room, room.members[socket.id], sessionId);
     socket.to(code).emit(EVENTS.MEMBER_JOINED, {
-      socketId: socket.id, nickname, color: room.members[socket.id].color,
+      socketId: socket.id,
+      nickname,
+      color: room.members[socket.id].color,
+      role: room.members[socket.id].role,
+      isCreator: room.members[socket.id].isCreator,
     });
     console.log(`[ROOM] ${nickname} joined: ${code}`);
+  });
+
+  // RESUME ROOM
+  socket.on(EVENTS.ROOM_RESUME, ({ code, memberSessionId }) => {
+    if (!code?.trim() || !memberSessionId?.trim()) return;
+
+    const normalizedCode = code.trim().toUpperCase();
+    const result = resumeRoom(normalizedCode, socket.id, memberSessionId.trim());
+
+    if (result?.error) {
+      if (result.kicked) {
+        socket.emit(EVENTS.ROOM_KICKED);
+        return;
+      }
+
+      socket.emit(EVENTS.ROOM_RESUME_FAILED, { reason: result.error });
+      return;
+    }
+
+    const {
+      room,
+      member,
+      previousSocketId,
+      previousPresence,
+      restoredHost,
+    } = result;
+
+    if (previousSocketId) {
+      io.sockets.sockets.get(previousSocketId)?.leave(normalizedCode);
+
+      if (previousPresence?.member) {
+        io.to(normalizedCode).emit(EVENTS.MEMBER_LEFT, {
+          nickname: previousPresence.member.nickname,
+        });
+      }
+
+      if (previousPresence?.wasInVoice) {
+        io.to(normalizedCode).emit('voice:userLeft', { socketId: previousSocketId });
+      }
+
+      if (previousPresence?.member) {
+        io.to(normalizedCode).emit(EVENTS.TYPING_UPDATE, {
+          nickname: previousPresence.member.nickname,
+          isTyping: false,
+        });
+      }
+    }
+
+    socket.join(normalizedCode);
+    emitRoomJoined(socket, normalizedCode, room, member, memberSessionId.trim(), true);
+    socket.to(normalizedCode).emit(EVENTS.MEMBER_JOINED, {
+      socketId: socket.id,
+      nickname: member.nickname,
+      color: member.color,
+      role: member.role,
+      isCreator: member.isCreator,
+    });
+
+    if (restoredHost) {
+      io.to(normalizedCode).emit(EVENTS.ROOM_HOST_BACK);
+    }
+
+    console.log(`[ROOM] Resumed: ${normalizedCode} by ${member.nickname}`);
   });
 
   // LEAVE
@@ -65,7 +126,8 @@ export function registerRoomHandlers(io, socket) {
     const result = getRoomBySocket(socket.id);
     if (!result) return;
     const { code, room } = result;
-    if (room.creatorSocketId !== socket.id) return;
+    const actor = room.members[socket.id];
+    if (!canManageChannels(actor, room)) return;
     if (room.channels[name]) return;
     if (Object.keys(room.channels).length >= LIMITS.MAX_CHANNELS) return;
     room.channels[name] = { messages: [], mediaBuffers: {} };
@@ -77,12 +139,60 @@ export function registerRoomHandlers(io, socket) {
     const result = getRoomBySocket(socket.id);
     if (!result) return;
     const { code, room } = result;
-    if (room.creatorSocketId !== socket.id) return;
-    if (!room.members[targetId]) return;
+    const actor = room.members[socket.id];
     const target = room.members[targetId];
-    delete room.members[targetId];
+    if (!target || !canKickMember(actor, target, room)) return;
+
+    const revoked = revokeMemberSession(code, targetId);
+    if (!revoked) return;
+
+    const targetSocket = io.sockets.sockets.get(targetId);
+    targetSocket?.leave(code);
+
     io.to(targetId).emit(EVENTS.ROOM_KICKED);
-    io.to(code).emit(EVENTS.MEMBER_LEFT, { nickname: target.nickname });
+    io.to(code).emit(EVENTS.MEMBER_LEFT, { nickname: revoked.member.nickname });
+    io.to(code).emit(EVENTS.TYPING_UPDATE, {
+      nickname: revoked.member.nickname,
+      isTyping: false,
+    });
+
+    if (revoked.wasInVoice) {
+      io.to(code).emit('voice:userLeft', { socketId: targetId });
+    }
+  });
+
+  // ROLE UPDATE (host only)
+  socket.on(EVENTS.MEMBER_ROLE_UPDATE, ({ socketId: targetId, role }) => {
+    const result = getRoomBySocket(socket.id);
+    if (!result) return;
+    const { code, room } = result;
+    const actor = room.members[socket.id];
+    const target = room.members[targetId];
+    if (!actor || !target) return;
+    if (room.creatorSessionId !== actor.sessionId) return;
+    if (target.sessionId === room.creatorSessionId) return;
+    if (![MEMBER_ROLES.MEMBER, MEMBER_ROLES.MODERATOR].includes(role)) return;
+
+    const updated = updateMemberRole(code, targetId, role);
+    if (!updated) return;
+
+    io.to(code).emit(EVENTS.MEMBER_ROLE_UPDATED, {
+      socketId: targetId,
+      role: updated.member.role,
+      isCreator: updated.member.isCreator,
+    });
+  });
+
+  // DELETE ROOM (host only)
+  socket.on(EVENTS.ROOM_DELETE, () => {
+    const result = getRoomBySocket(socket.id);
+    if (!result) return;
+    const { code, room } = result;
+    const actor = room.members[socket.id];
+    if (!actor || room.creatorSessionId !== actor.sessionId) return;
+
+    deleteRoom(code);
+    io.to(code).emit(EVENTS.ROOM_DELETED);
   });
 
   // TYPING
@@ -110,26 +220,79 @@ export function registerRoomHandlers(io, socket) {
   registerHostHandlers(io, socket);
 }
 
+function canManageChannels(actor, room) {
+  if (!actor) return false;
+  if (room.creatorSessionId === actor.sessionId) return true;
+  return actor.role === MEMBER_ROLES.MODERATOR;
+}
+
+function canKickMember(actor, target, room) {
+  if (!actor || !target) return false;
+
+  const actorIsHost = room.creatorSessionId === actor.sessionId;
+  const actorIsModerator = actor.role === MEMBER_ROLES.MODERATOR;
+  const targetIsHost = room.creatorSessionId === target.sessionId;
+  const targetIsModerator = target.role === MEMBER_ROLES.MODERATOR;
+
+  if (actorIsHost) {
+    return !targetIsHost;
+  }
+
+  if (actorIsModerator) {
+    return !targetIsHost && !targetIsModerator;
+  }
+
+  return false;
+}
+
 function handleLeave(io, socket) {
   const result = leaveRoom(socket.id);
   if (!result) return;
-  const { code, member, wasCreator } = result;
-  const room = getRoom(code);
+  const { code, room, member, wasCreator, wasInVoice } = result;
   socket.leave(code);
   io.to(code).emit(EVENTS.MEMBER_LEFT, { nickname: member.nickname });
+  io.to(code).emit(EVENTS.TYPING_UPDATE, { nickname: member.nickname, isTyping: false });
+
+  if (wasInVoice) {
+    io.to(code).emit('voice:userLeft', { socketId: socket.id });
+  }
+
   if (!room) return;
 
   if (wasCreator) {
-    const membersLeft = Object.keys(room.members).length;
-    if (membersLeft === 0) { deleteRoom(code); console.log(`[ROOM] Deleted (empty): ${code}`); return; }
-    io.to(code).emit(EVENTS.ROOM_HOST_WARNING, { secondsLeft: 60 });
+    if (room.gracePeriodTimer) {
+      clearTimeout(room.gracePeriodTimer);
+    }
+
+    io.to(code).emit(EVENTS.ROOM_HOST_WARNING, {
+      secondsLeft: Math.floor(LIMITS.GRACE_PERIOD_MS / 1000),
+    });
     console.log(`[ROOM] Creator left ${code} — grace period`);
     room.gracePeriodTimer = setTimeout(() => {
       deleteRoom(code);
       io.to(code).emit(EVENTS.ROOM_DELETED);
       console.log(`[ROOM] Deleted (grace expired): ${code}`);
-    }, 60000);
+    }, LIMITS.GRACE_PERIOD_MS);
   } else {
-    if (Object.keys(room.members).length === 0) { deleteRoom(code); console.log(`[ROOM] Deleted (empty): ${code}`); }
+    if (Object.keys(room.members).length === 0 && !room.gracePeriodTimer) {
+      deleteRoom(code);
+      console.log(`[ROOM] Deleted (empty): ${code}`);
+    }
   }
+}
+
+function emitRoomJoined(socket, code, room, member, memberSessionId, resumed = false) {
+  socket.emit(EVENTS.ROOM_JOINED, {
+    code,
+    roomState: getRoomSnapshot(code),
+    you: {
+      nickname: member.nickname,
+      color: member.color,
+      role: member.role,
+      isCreator: member.isCreator,
+    },
+    hasPassword: !!room.password,
+    memberSessionId,
+    resumed,
+  });
 }
